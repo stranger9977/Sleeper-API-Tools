@@ -193,9 +193,10 @@ def get_rosters(user_id):
 
     final_draft_order_df['team'] = 'Draft'
     final_draft_order_df = final_draft_order_df[['display_name','full_name','merge_name','position','team']]
-    values_df = pd.read_csv('/Users/nick/sleepertoolsversion2/values/values.csv')
+    url = 'https://raw.githubusercontent.com/stranger9977/Sleeper-API-Tools/master/values/values.csv'
+    values_df = pd.read_csv(url)
     players_df = pd.read_csv(
-        '/Users/nick/sleepertoolsversion2/values/player_urls.csv')
+        'https://raw.githubusercontent.com/stranger9977/Sleeper-API-Tools/master/values/player_urls.csv')
     rosters_df = rosters_df[rosters_df['players'].str.isnumeric()]
     rosters_df['players'] = rosters_df['players'].astype(int)
     rosters_values_df = rosters_df.merge(players_df, left_on='players', right_on='player_id', how='left')
