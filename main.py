@@ -35,7 +35,7 @@ def get_rosters(user_id):
 
     option = st.selectbox(
         'Please Choose Your League',
-        (league_name_list), index=2 )
+        (league_name_list), index=1 )
 
     # Load data into a pandas DataFrame
     # Create a multiselect widget
