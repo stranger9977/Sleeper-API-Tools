@@ -183,7 +183,6 @@ def get_rosters(user_id):
 
     final_draft_order_df = final_draft_order_df.rename(columns={'new_owner_id': 'roster_id'})
     final_draft_order_df = final_draft_order_df.merge(rosters_draft_df, how='left', on='roster_id')
-    final_draft_order_df.to_csv('/Users/nick/sleeper_api_tools/picks.csv')
 
     final_draft_order_df["pick_concat"] = final_draft_order_df.Pick.map("{:02}".format)
 
