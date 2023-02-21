@@ -53,7 +53,7 @@ df["full_name"] = df.full_name.apply(lambda x: unidecode.unidecode(x))
 
 # Create Column to match with RotoGrinders
 df["merge_name"] = df.full_name.apply(
-    lambda x: x.lower().split(" ")[0][0:4] + x.lower().split(" ")[1][0:5]
+    lambda x: x.lower().split(" ")[0][0:4] + x.lower().split(" ")[1][0:6]
 )
 df = df[['player_id','full_name','merge_name','position','team']]
 df = df[df['position'].isin(['QB','WR','TE','RB'])]

@@ -6,7 +6,7 @@ from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 import unidecode as unidecode
 from cmath import exp
-
+import re
 
 
 driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()))
@@ -80,16 +80,24 @@ df["full_name"] = df.full_name.apply(lambda x: unidecode.unidecode(x))
 
 # Create Column to match with RotoGrinders
 df["merge_name"] = df.full_name.apply(
-    lambda x: x.lower().split(" ")[0][0:4] + x.lower().split(" ")[1][0:5]
+    lambda x: x.lower().split(" ")[0][0:4] + x.lower().split(" ")[1][0:6]
 )
+regex = re.compile(r'\d+')
 
+# create a boolean mask that identifies which rows have numbers in the "merge name" column
+has_numbers = df['merge_name'].str.contains(regex)
+
+# apply the regular expression to the selected rows using the str.replace() method
+df.loc[has_numbers, 'merge_name'] = df.loc[has_numbers, 'merge_name'].apply(lambda x: re.sub(r'[a-zA-Z]', '', x))
 df['etr_name'] = df['Player']
 
 df['ETR Rank'] = df['SF/TE Prem'].rank(ascending=True, method='average')
 df['ETR Value'] = round(df['ETR Rank'].apply(lambda x : 10500 * exp(x* - 0.0235)),0)
 df['ETR Value'] = df['ETR Value'].astype(float)
 df.sort_values(by='ETR Value', ascending=False, inplace=True)
-df = df[['etr_name','merge_name','ETR Value','ETR Rank']]
+df = df.groupby('merge_name')[['ETR Value','ETR Rank']].median().reset_index()
+
+df = df[['merge_name','ETR Value','ETR Rank']]
 df.to_csv('/Users/nick/sleepertoolsversion2/values/etr_ranks.csv', index=False)
 
 
