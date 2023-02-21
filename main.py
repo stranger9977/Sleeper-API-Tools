@@ -5,9 +5,14 @@ import requests
 import pandas as pd
 import json
 import plotly.express as px
+import plotly.graph_objects as go
+
+
+
 
 
 def main():
+    st.title('Data, Bitch')
     username = st.text_input('Enter your sleeper username here', 'brochillington')
     user_id = get_user_id(username)
     get_rosters(user_id)
@@ -27,7 +32,6 @@ def get_rosters(user_id):
     league_id_list = [d['league_id'] for d in leagues]
     league_name_list = [d['name'] for d in leagues]
     draft_id_list = [d['draft_id'] for d in leagues]
-
 
     option = st.selectbox(
         'Please Choose Your League',
@@ -248,19 +252,53 @@ def get_rosters(user_id):
                 )
 
     if option:
+        st.title('OVERALL HIM RANKING')
+        st.write(
+            'HIM RANK determined by aggregated market values')
         st.markdown(html, unsafe_allow_html=True)
-
+        st.title('TOTAL HIM VALUE')
         fig = px.histogram(rosters_values_df
                            , x="display_name", y="HIM VALUE", hover_data=['full_name'])
         fig.update_layout(xaxis={'categoryorder': 'total descending'})
+        fig.update_layout(xaxis_title='Manager', yaxis_title='Total HIM VALUE')
+        fig.update_traces(marker_color='#fc6f03')
+
         st.plotly_chart(fig, use_container_width=True)
+        avg_by_position = rosters_values_df.groupby('position')['HIM VALUE'].mean().reset_index
+        df = rosters_values_df[['display_name','position','HIM VALUE']]
+        df.rename(columns={'display_name': 'Manager','position':'Position'},inplace=True)
+        avg_values = df.groupby(['Manager', 'Position'])['HIM VALUE'].mean().reset_index()
+        avg_values = avg_values.groupby('Position')['HIM VALUE'].mean().reset_index()
+
+        # create the streamlit app
+        st.title('Manager Value by Position')
+        st.write(
+            'Select a manager from the dropdown menu to see their total value at each position and how they compare to the average manager value at each position.')
+
+        # create the dropdown menu
+        managers = df['Manager'].unique()
+        selected_manager = st.selectbox('Select a manager', managers)
+
+        # filter the dataframe by the selected manager
+        manager_df = df[df['Manager'] == selected_manager]
+        manager_df = manager_df.groupby('Position')['HIM VALUE'].mean().reset_index()
 
 
+        # merge with the average values dataframe
 
-        fig = px.histogram(rosters_values_df, x="display_name", y='HIM VALUE', color='position', barmode='group')
-        fig.update_layout(xaxis={'categoryorder': 'total descending'})
-        st.plotly_chart(fig, use_container_width=True)
+        # create the plotly chart
+        trace1 = go.Bar(x=manager_df['Position'], y=manager_df['HIM VALUE'],
+                        name=selected_manager, marker={'color': '#9403fc'})
+        trace2 = go.Bar(x=avg_values['Position'], y=avg_values['HIM VALUE'],
+                        name='Average', marker={'color': '#03fc2c'})
 
+        # create layout and figure
+        layout = go.Layout(title=f"{selected_manager}'s Average Value by Position Compared to the Average Manager Value by Position",
+                           xaxis={'title': 'Position'},
+                           yaxis={'title': 'AVG Value'},
+                           barmode='group')
+        fig = go.Figure(data=[trace1, trace2], layout=layout)
+        st.plotly_chart(fig)
 
     return rosters_values_df
 
