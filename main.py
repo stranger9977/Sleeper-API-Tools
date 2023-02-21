@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 
 
 def main():
-    st.title('Data, Bitch')
+    st.title('The Scroll')
     username = st.text_input('Enter your sleeper username here', 'brochillington')
     user_id = get_user_id(username)
     get_rosters(user_id)
