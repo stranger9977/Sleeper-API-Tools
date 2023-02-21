@@ -33,6 +33,16 @@ def get_rosters(user_id):
         'Please Choose Your League',
         (league_name_list), index=2 )
 
+    # Load data into a pandas DataFrame
+    # Create a multiselect widget
+    positions = ["QB", "RB", "WR",'TE']
+    selected_positions = st.multiselect("Select Positions", positions)
+
+    # Filter the DataFrame based on the selected options
+
+
+    # Display the filtered DataFrame
+
     league_name_id = dict(zip(league_name_list, league_id_list))
     league_name_draft_id = dict(zip(league_name_list, draft_id_list))
 
@@ -182,18 +192,56 @@ def get_rosters(user_id):
     final_draft_order_df = final_draft_order_df[['display_name','full_name','merge_name','position','team']]
     values_df = pd.read_csv('/Users/nick/sleepertoolsversion2/values/values.csv')
     players_df = pd.read_csv(
-        '/Users/nick/sleepertoolsversion2/values/players.csv')
+        '/Users/nick/sleepertoolsversion2/values/player_urls.csv')
     rosters_df = rosters_df[rosters_df['players'].str.isnumeric()]
     rosters_df['players'] = rosters_df['players'].astype(int)
     rosters_values_df = rosters_df.merge(players_df, left_on='players', right_on='player_id', how='left')
-    rosters_values_df = rosters_values_df[['display_name','full_name','merge_name','position','team']]
-    rosters_values_df
+    rosters_values_df = rosters_values_df[['display_name','full_name','merge_name','position','team_logo_espn','headshot_url']]
+    rosters_values_df.dropna(subset=['full_name'], inplace=True)
     rosters_values_df = pd.concat([final_draft_order_df,rosters_values_df])
     rosters_values_df = rosters_values_df.merge(values_df, on='merge_name')
+    rosters_values_df.sort_values(by=['HIM RANK'], inplace=True)
+    rosters_values_df['Pos Rank'] = rosters_values_df.groupby('position')['HIM RANK'].cumcount() + 1
 
+    rosters_table_df = rosters_values_df[['HIM RANK', 'display_name','headshot_url','full_name','Pos Rank','position','team_logo_espn']]
+
+    rosters_table_df['headshot_url'] =  rosters_table_df['headshot_url'] \
+        .str.replace(
+        '(.*)',
+        '<img src="\\1" style="max-height:62px;"></img>')
+    rosters_table_df['team_logo_espn'] = rosters_table_df['team_logo_espn'] \
+        .str.replace(
+        '(.*)',
+        '<img src="\\1" style="max-height:62px;"></img>')
+    rosters_table_df.rename(columns={'display_name':'Manager','full_name':"Name", 'position':'Pos','team_logo_espn':'team','headshot_url':''}, inplace=True)
+
+
+
+
+    if len(selected_positions) > 0:
+        rosters_table_df = rosters_table_df[rosters_table_df["Pos"].isin(selected_positions)]
+
+    else:
+        rosters_table_df = rosters_table_df
+
+    html = (rosters_table_df
+                .style \
+                .format({
+
+            'HIM RANK': '{:.0f}'.format,
+
+        }) \
+                .set_properties(
+            **{'text-align': 'center', 'font': 'Bebas Neue', 'font-weight': 'bold', 'font-size': '16px',
+               'padding': '5px'}) \
+                # .set_table_styles([{'selector': 'th', 'props': [('background-color', '#30b5fd'),('font-size','20px'),('color','white'),('padding','5px')]}])\
+                .set_sticky(axis=1) \
+                .hide_index() \
+                .render()
+                )
 
     if option:
-        st.write(rosters_values_df)
+        st.markdown(html, unsafe_allow_html=True)
 
         fig = px.histogram(rosters_values_df
                            , x="display_name", y="HIM VALUE", hover_data=['full_name'])

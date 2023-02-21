@@ -20,8 +20,10 @@ values_df['Low Rank'] = values_df[['KTC Rank', 'ETR Rank', 'DyPro Rank']].max(ax
 values_df['High Source'] = values_df[['KTC Rank', 'ETR Rank', 'DyPro Rank']].apply(lambda x: x.idxmin(), axis=1)
 values_df['Low Source'] = values_df[['KTC Rank', 'ETR Rank', 'DyPro Rank']].apply(lambda x: x.idxmax(), axis=1)
 
+values_df.sort_values(by='HIM VALUE', ascending=False, inplace=True)
+values_df['HIM RANK'] = values_df['Rank'] = range(1, len(values_df) + 1)
 
-values_df['HIM RANK'] = values_df['HIM VALUE'].rank(ascending=False, method='dense')
+
 values_df.rename(columns={'dypro_age':'Age'}, inplace=True)
 missing_cols = ['KTC Value', 'DyPro Value', 'ETR Value']
 values_df = values_df[(values_df['HIM VALUE'].notna())]
