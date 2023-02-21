@@ -226,7 +226,7 @@ def get_rosters(user_id):
 
     range_slider = st.slider('Select a range of rankings', min_value=int(min_rank), max_value=int(max_rank),
                              value=(int(min_rank), int(100)), step=int(1))
-    rosters_table_df = rosters_table_df[(rosters_table_df['HIM RANK'] > range_slider[0]) & (rosters_table_df['HIM RANK'] <= range_slider[1])]
+    rosters_table_df = rosters_table_df[(rosters_table_df['HIM RANK'] >= range_slider[0]) & (rosters_table_df['HIM RANK'] <= range_slider[1])]
 
     if len(selected_positions) > 0:
         rosters_table_df = rosters_table_df[rosters_table_df["Pos"].isin(selected_positions)]
