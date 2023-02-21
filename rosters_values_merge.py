@@ -10,8 +10,9 @@ ktc_values_df = pd.read_csv(
 etr_values_df = pd.read_csv(
         '/Users/nick/sleepertoolsversion2/values/etr_ranks.csv')
 
-merged_df = dypro_values_df.merge(etr_values_df, on='merge_name', how='left')
-values_df = merged_df.merge(ktc_values_df, on='merge_name', how='left')
+merged_df = ktc_values_df.merge(etr_values_df, on='merge_name', how='left')
+values_df = merged_df.merge(dypro_values_df, on='merge_name', how='left')
+
 values_df['HIM VALUE'] = round(values_df[['KTC Value', 'ETR Value', 'DyPro Value']].mean(axis=1),0)
 values_df['Uncertainty'] = round(values_df[['KTC Value', 'ETR Value', 'DyPro Value']].std(axis=1),0)
 values_df['High Rank'] = values_df[['KTC Rank', 'ETR Rank', 'DyPro Rank']].min(axis=1)
@@ -23,8 +24,8 @@ values_df['Low Source'] = values_df[['KTC Rank', 'ETR Rank', 'DyPro Rank']].appl
 values_df['HIM RANK'] = values_df['HIM VALUE'].rank(ascending=False, method='dense')
 values_df.rename(columns={'dypro_age':'Age'}, inplace=True)
 missing_cols = ['KTC Value', 'DyPro Value', 'ETR Value']
-values_df = values_df[(values_df['HIM VALUE']>1)]
 values_df = values_df[(values_df['HIM VALUE'].notna())]
+
 # missing_values_slice = missing_values_slice[(missing_values_slice['team'].notna())]
 #
 # missing_values_slice = missing_values_slice.loc[missing_values_slice[missing_cols].isna().any(axis=1), :]
