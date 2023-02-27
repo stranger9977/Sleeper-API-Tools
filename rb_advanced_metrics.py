@@ -21,124 +21,180 @@ from PIL import Image
 import matplotlib.font_manager as font_manager
 
 
-seasons = np.arange(2011,2023).tolist()
+seasons = np.arange(2022,2023).tolist()
 df = nfl.import_pbp_data(seasons)
+df = df[(df['season_type'] == 'REG') & (df['week'] <= 16)]
 
-df.info(verbose=True)
-
+#get detailed roster ddata like headshoturl, entry year rookie year etc.
 roster_data = pd.DataFrame()
-
 # Loop over the past 5 years (including the current year)
-for year in range(2022, 2011, -1):
+for year in range(2022, 2016, -1):
     # Import the roster data for the current year
     roster_df = nfl.import_rosters([year])
 
     # Append the roster data to the new DataFrame
     roster_data = roster_data.append(roster_df, ignore_index=True)
-
-roster_df = nfl.import_rosters([2022])
 roster_df = roster_data
-print(roster_df.columns)
-# roster_df.info(verbose=True)
-#
-# roster_df = roster_df[['player_id','player_name','team','position','sleeper_id','headshot_url']]
-#
-# team_data = nfl.import_team_desc()
-# team_df = pd.DataFrame(team_data)
-#
-# team_df = team_df[['team_abbr', 'team_logo_espn','team_league_logo','team_color','team_color2']]
-# player_team = roster_df.merge(team_df, left_on='team', right_on='team_abbr')
-# player_team['team_logo_espn'].fillna(player_team['team_league_logo'], inplace=True)
-# player_team['player_id'] = player_team['player_id'].astype(str)
-#
-# player_team['headshot_html'] =  player_team['headshot_url'] \
-#         .str.replace(
-#         '(.*)',
-#         '<img src="\\1" style="max-height:62px;"></img>')
-# player_team['team_logo_espn_html'] = player_team['team_logo_espn'] \
-#         .str.replace(
-#         '(.*)',
-#         '<img src="\\1" style="max-height:62px;"></img>')
-# rb_roster_df = player_team[player_team['position'] == 'RB'].drop('position',axis = 1)
-#
-#
-# # df = df.dropna(subset=['player_id'])
-#
-# # df = df.merge(roster, on='player_id')
-# # df.info(verbose=True)
-# # weighted_opportunity_df = df[['player_id','player_name','receiver_player_id','game_id','pass_attempt','rush_attempt','yardline_100']]
-# # plays_per_game_df = df[['player_id','player_name','game_id']]
-# # goal_to_go_att = df[['player_id','player_name','game_id','rush_attempt','goal_to_go']]
-# # team_tgt = df[['player_id','player_name','posteam','pass_attempt']]
-#
-# df['goal_to_go_attempt'] = 0
-#
-#
-# # update the values in the new column based on the conditions
-#
-# df.loc[(df['goal_to_go'] == True) & (df['rush_attempt'] == 1), 'goal_to_go_attempt'] = 1
-#
-# goal_df = df.groupby(['game_id', 'rusher_player_id', 'rusher_player_name', 'posteam'], as_index=False)['goal_to_go_attempt'].sum()
-#
-# goal_df = goal_df.groupby(['rusher_player_id', 'rusher_player_name', 'posteam'], as_index=False)[['goal_to_go_attempt']].sum().sort_values(by='goal_to_go_attempt', ascending=False)
-#
-# df = df.groupby('receiver_player_id').filter(lambda x: x['game_id'].nunique() >= 6)
+roster_df.info(verbose=True)
+roster_df = roster_df[['player_id','player_name','team','position','sleeper_id','headshot_url','entry_year']]
+
+#get team desc
+team_data = nfl.import_team_desc()
+team_df = pd.DataFrame(team_data)
+team_df = team_df[['team_abbr', 'team_logo_espn','team_league_logo','team_color','team_color2']]
+
+#merge rosters to
+player_team = roster_df.merge(team_df, left_on='team', right_on='team_abbr')
+player_team['team_logo_espn'].fillna(player_team['team_league_logo'], inplace=True)
+player_team['player_id'] = player_team['player_id'].astype(str)
+#convert to html_tag if needed
+player_team['headshot_html'] =  player_team['headshot_url'] \
+        .str.replace(
+        '(.*)',
+        '<img src="\\1" style="max-height:62px;"></img>')
+player_team['team_logo_espn_html'] = player_team['team_logo_espn'] \
+        .str.replace(
+        '(.*)',
+        '<img src="\\1" style="max-height:62px;"></img>')
+rb_roster_df = player_team[player_team['position'] == 'RB'].drop('position',axis = 1)
+
+#aggregate rush_attempts per player, per game, per yardline
+#this gives a weighted opportunity to every single rush attempt in the players career based on if it was in the redzone or not
+rush_df = df.groupby(['rusher_player_id', 'rusher_player_name', 'game_id', 'yardline_100','play_id'])['rush_attempt'].sum().reset_index()
+rush_df['weighted_opportunity'] = 0
+rush_df.loc[rush_df['yardline_100'] < 80, 'weighted_opportunity'] = 0.49
+rush_df.loc[rush_df['yardline_100'] >= 80, 'weighted_opportunity'] = 1.35
+
+#aggregate rush_attempts per player, per game, per yardline
+#this gives a weighted opportunity to every single rush attempt in the players career based on if it was in the redzone or not
+receiver_df = df.groupby(['receiver_player_id', 'receiver_player_name', 'game_id', 'yardline_100','play_id'])['pass_attempt'].sum().reset_index()
+receiver_df['weighted_opportunity'] = 0
+receiver_df.loc[receiver_df['yardline_100'] < 80, 'weighted_opportunity'] = 1.48
+receiver_df.loc[receiver_df['yardline_100'] >= 80, 'weighted_opportunity'] = 2.29
+
+#merge these two dataframes together to get total weighted opportunities
+receiver_opportunity_df = receiver_df.rename(columns={'receiver_player_id': 'player_id','receiver_player_name':'player_name'})
+rush_df = rush_df.rename(columns={'rusher_player_id': 'player_id','rusher_player_name':'player_name'})
+
+#could have concatenated here, but this is the same basically
+merged_opportunity_df = rush_df.merge(receiver_opportunity_df, on=['player_id', 'player_name', 'game_id','weighted_opportunity'], how='outer')
+# get the number of games for each player
+game_df = merged_opportunity_df.groupby(['player_id', 'player_name'], as_index=False)['game_id'].nunique()
+
+# aggregate and sum to get total weighted opportunity
+merged_opportunity_sum_df = merged_opportunity_df.groupby(['player_id', 'player_name'])['weighted_opportunity'].sum().reset_index()
+# merge to get total number of games
+merged_opportunity_sum_per_game_df = merged_opportunity_sum_df.merge(game_df, on=('player_id','player_name',))
+merged_opportunity_sum_per_game_df.rename(columns={'game_id':'games'},inplace=True)
+#calculate weighted opportunity per game
+merged_opportunity_sum_per_game_df['weighted_opportunity_per_game'] = merged_opportunity_sum_per_game_df['weighted_opportunity'] / merged_opportunity_sum_per_game_df['games']
+
+
+
+# # # df = df.dropna(subset=['player_id'])
 # #
-# target_df = df.groupby(['game_id', 'receiver_player_id', 'receiver_player_name', 'posteam'], as_index=False)['pass_attempt'].sum().merge(df.loc[df['receiver_player_id'].notnull()].groupby(['game_id', 'posteam'], as_index=False)['pass_attempt'].sum(), on=['game_id', 'posteam'], suffixes=('_player', '_team'))
-# target_df['target_share'] = round(target_df['pass_attempt_player'] / target_df['pass_attempt_team'] * 100, 2)
-# target_df = target_df.groupby(['receiver_player_id', 'receiver_player_name', 'posteam'], as_index=False)[['target_share' , 'pass_attempt_player']].mean().sort_values(by='target_share', ascending=False)
-# target_df.rename(columns={'receiver_player_id':'player_id', 'posteam':'team','pass_attempt_player':'player_targets','pass_attempt_team':'team_targets'}, inplace=True)
-# goal_df.rename(columns={'rusher_player_id':'player_id', 'posteam':'team','goal_to_go_attempt':'goal_to_go_attempts'}, inplace=True)
+# # # df = df.merge(roster, on='player_id')
+# # # df.info(verbose=True)
+# # # weighted_opportunity_df = df[['player_id','player_name','game_id','pass_attempt','rush_attempt','yardline_100']]
+# # # plays_per_game_df = df[['player_id','player_name','game_id']]
+# # # goal_to_go_att = df[['player_id','player_name','game_id','rush_attempt','goal_to_go']]
+# # # team_tgt = df[['player_id','player_name','posteam','pass_attempt']]
+
+
+df['goal_to_go_attempt'] = 0
+# update the values in the new column based on the conditions
+
+df.loc[(df['goal_to_go'] == True) & (df['rush_attempt'] == 1), 'goal_to_go_attempt'] = 1
+
+# Group the dataframe by player and team and calculate the sum of goal-to-go attempts
+goal_df = df.groupby(['rusher_player_id', 'rusher_player_name'], as_index=False)['goal_to_go_attempt'].sum()
+
+# Count the number of seasons each player and team played in
+seasons_df = df.groupby(['rusher_player_id', 'rusher_player_name'], as_index=False)['season'].nunique()
+
+# Merge the two dataframes on player, team, and season
+goal_df = pd.merge(goal_df, seasons_df, on=['rusher_player_id', 'rusher_player_name'])
+
+# Calculate the average goals_to_go_attempts per season
+goal_df['goal_to_go_attempts_per_season'] = goal_df['goal_to_go_attempt'] / goal_df['season']
+
+# Sort the dataframe by average goals_to_go_attempts per season in descending order
+goal_df = goal_df.sort_values(by='goal_to_go_attempts_per_season', ascending=False)
+
+goal_df = goal_df.merge(rb_roster_df, left_on=('rusher_player_id'),right_on=('player_id'))
+goal_df = goal_df[['rusher_player_id', 'rusher_player_name', 'goal_to_go_attempt',
+       'season', 'goal_to_go_attempts_per_season',
+       'team', 'sleeper_id', 'headshot_url', 'entry_year', 'team_abbr',
+       'team_logo_espn', 'team_league_logo', 'team_color', 'team_color2',
+       'headshot_html', 'team_logo_espn_html']]
+# Sort the dataframe by average goals_to_go_attempts per season in descending order
+goal_df = goal_df.sort_values(by='goal_to_go_attempts_per_season', ascending=False)
+
+
+goal_df = goal_df.merge(merged_opportunity_sum_per_game_df, left_on=('rusher_player_id','rusher_player_name'),right_on=('player_id','player_name'))
+goal_df['entry_year'] = goal_df['entry_year'].astype(float)
+
+
+# Sort the dataframe by average goals_to_go_attempts per season in descending order
+# goal_df = goal_df[(goal_df['entry_year'] >= float(2017)) & (~goal_df['entry_year'].isnull())]
+goal_df = goal_df[['player_id','team','goal_to_go_attempts_per_season','weighted_opportunity_per_game','player_name','headshot_url','entry_year','team_abbr', 'team_logo_espn','team_league_logo','team_color','team_color2']]
+
+# goal_df = pd.merge(goal_df, games_played, on='rusher_player_id', how='left')
 #
-# target_df = target_df[['player_id','team','target_share']]
-# goal_df = goal_df[['player_id','team','goal_to_go_attempts']]
+df = df.groupby('receiver_player_id').filter(lambda x: x['game_id'].nunique() >= 6)
 #
-# target_df = target_df.merge(goal_df, on=('player_id','team'))
-# target_df = rb_roster_df.merge(target_df, on=('player_id','team'))
-# target_df = target_df.drop_duplicates(subset=['player_id', 'team','target_share'])
-# target_df.sort_values(by='goal_to_go_attempts', ascending=False,inplace=True)
-# target_df.rename(columns={'player_name':"Name",'team_logo_espn':'Team', 'target_share':'Team TGT %', 'goal_to_go_attempts': 'Goal to Go ATTs'}, inplace=True)
-#
-#
-# visual_df = target_df[['Name','headshot_url','Team','Team TGT %','Goal to Go ATTs','team_color','team_color2']]
-# visual_df.to_csv('visual_df.csv', index=False)
-# #
-# # # Load the processed data from a file
-# #
-# #
-# # # visual_df=visual_df[:25]
+target_df = df.groupby(['game_id', 'receiver_player_id', 'receiver_player_name', 'posteam'], as_index=False)['pass_attempt'].sum().merge(df.loc[df['receiver_player_id'].notnull()].groupby(['game_id', 'posteam'], as_index=False)['pass_attempt'].sum(), on=['game_id', 'posteam'], suffixes=('_player', '_team'))
+target_df['target_share'] = round(target_df['pass_attempt_player'] / target_df['pass_attempt_team'] * 100, 2)
+target_df = target_df.groupby(['receiver_player_id', 'receiver_player_name', 'posteam'], as_index=False)[['target_share' , 'pass_attempt_player']].mean().sort_values(by='target_share', ascending=False)
+target_df.rename(columns={'receiver_player_id':'player_id', 'posteam':'team','pass_attempt_player':'player_targets','pass_attempt_team':'team_targets'}, inplace=True)
+
+target_df = target_df[['player_id','team','target_share']]
+
+target_df = target_df.merge(goal_df, on=('player_id','team'))
+target_df = target_df.drop_duplicates(subset=['player_id', 'team','target_share'])
+target_df.sort_values(by='weighted_opportunity_per_game', ascending=False,inplace=True)
+target_df.rename(columns={'player_name':"Name",'team_logo_espn':'Team', 'target_share':'Average Team Target Share % per Game', 'goal_to_go_attempts_per_season': 'Average Goal to Go Attempts per Season', 'weighted_opportunity_per_game':'Weighted Opportunity Per Game'}, inplace=True)
+
+
+visual_df = target_df[['Name','headshot_url','team','Average Goal to Go Attempts per Season','Average Team Target Share % per Game','Weighted Opportunity Per Game','team_color','team_color2']]
+visual_df.to_csv('visual_df.csv', index=False)
 # # #
-# # # visual_df = visual_df.reset_index(drop=True)
-# #
-# #
-# # # rb_html = (visual_df
-# # #  .style\
-# # #  .format({
-# # #      'Team TGT %': '{:.2f}%'.format
-# # #      })\
-# # # .set_properties(**{'text-align':'center','font':'Bebas Neue','font-weight':'bold','font-size':'16px','padding':'5px'})\
-# # # # .set_table_styles([{'selector': 'th', 'props': [('background-color', '#30b5fd'),('font-size','20px'),('color','white'),('padding','5px')]}])\
-# # #  .hide_index()\
-# # #  .render()
-# # #  )
-# # #
-# # # import os
-# # #
-# # # # to open/create a new html file in the write mode
-# # # f = open('rb_html.html', 'w')
-# # #
-# # # # the html code which will go in the file GFG.html
-# # #
-# # # # writing the code into the file
-# # # f.write(rb_html)
-# # #
-# # # # close the file
-# # # f.close()
-# # #
-# # # # 1st method how to open html files in chrome using
-# # # filename = 'file:///'+os.getcwd()+'/' + 'rb_html.html'
+# # # # Load the processed data from a file
 # # #
 # # #
-# # # import IPython
-# # # IPython.display.HTML(filename='/content/rb_html.html')
-# #
+# # # # visual_df=visual_df[:25]
+# # # #
+# # # # visual_df = visual_df.reset_index(drop=True)
+# # #
+# # #
+# # # # rb_html = (visual_df
+# # # #  .style\
+# # # #  .format({
+# # # #      'Team TGT %': '{:.2f}%'.format
+# # # #      })\
+# # # # .set_properties(**{'text-align':'center','font':'Bebas Neue','font-weight':'bold','font-size':'16px','padding':'5px'})\
+# # # # # .set_table_styles([{'selector': 'th', 'props': [('background-color', '#30b5fd'),('font-size','20px'),('color','white'),('padding','5px')]}])\
+# # # #  .hide_index()\
+# # # #  .render()
+# # # #  )
+# # # #
+# # # # import os
+# # # #
+# # # # # to open/create a new html file in the write mode
+# # # # f = open('rb_html.html', 'w')
+# # # #
+# # # # # the html code which will go in the file GFG.html
+# # # #
+# # # # # writing the code into the file
+# # # # f.write(rb_html)
+# # # #
+# # # # # close the file
+# # # # f.close()
+# # # #
+# # # # # 1st method how to open html files in chrome using
+# # # # filename = 'file:///'+os.getcwd()+'/' + 'rb_html.html'
+# # # #
+# # # #
+# # # # import IPython
+# # # # IPython.display.HTML(filename='/content/rb_html.html')
+# # #

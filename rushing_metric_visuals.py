@@ -1,21 +1,23 @@
-import nfl_data_py as nfl
-import pprint as pp
 import pandas as pd
 import numpy as np
 import requests
-import os
-import io
 from io import BytesIO
 from PIL import Image
-import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import matplotlib.font_manager as font_manager
 
-# Load the data
+seasons = np.arange(2022,2023).tolist()
 visual_df = pd.read_csv('visual_df.csv')
-metric_list = ['Team TGT %']
-visual_df = visual_df.replace('nan', np.nan)
+visual_df = visual_df.drop_duplicates(subset='Name', keep='last')
+
+
+metric_list = ['Weighted Opportunity Per Game']
+# comment out for tgt share graph
+# visual_df = visual_df.groupby(['Name']).max().reset_index()
+#
+# visual_df = visual_df.replace('nan', np.nan)
+# print(visual_df.columns)
 
 visual_df = visual_df.dropna(subset = ['headshot_url'])
 for metric in metric_list:
@@ -76,38 +78,32 @@ for metric in metric_list:
 
     # Set the font for the axis and plot titles
 
-    ax.set_xlabel(metric, fontproperties=exo_regular, fontsize=18, labelpad=20, color='#FCC331')
-
-    ax.set_facecolor('#202F52')
-
-    fig.patch.set_facecolor('#202F52')
-    ax.set_title(f'Top 15 RBs: {metric} 2011-2022', fontproperties=exo_regular, fontsize=26,pad=20, fontweight='bold', loc='left', color='#FCC331')
+    ax.set_xlabel(metric, fontproperties=exo_regular, fontsize=18, labelpad=20,  y=-1)
+    print(seasons)
+    ax.set_title(f'Top 15 RBs: {metric}, {seasons[0]} - {seasons[len(seasons)-1]}', fontproperties=exo_regular, fontsize=26,pad=20, fontweight='bold', loc='left')
+    plt.suptitle(
+        'Opportunity Weights: RedZone Carry = 1.35, RedZone Target = 2.29, Carry Outside the RedZone = 0.49, Target Outside the RedZone = 1.48')
     if '%' in metric:
         # Set the format string for percentage values
         format_str = '{:.02f}%'
     else:
         # Set the format string for non-percentage values
-        format_str = '{:.0f}'
+        format_str = '{:.1f}'
     for i, v in enumerate(sorted_df[metric]):
+        # Calculate the position of the label based on the xlim
 
-        ax.text(v + .80, i - 0.25, format_str.format(v), color='#FCC331', fontproperties=exo_regular)
+        ax.text(v+0.15, i - 0.01, format_str.format(v), fontproperties=exo_regular)
 
     # Set the color of the tick marks to #FCC331
 
-    ax.tick_params(axis='both', colors='#FCC331')
+    ax.tick_params(axis='both')
 
     # Set the color of the border of the plot to #FCC331
 
-    for spine in ax.spines.values():
-
-        spine.set_edgecolor('#FCC331')
-
     # Set the background color of the figure
 
-    fig.patch.set_facecolor('#202F52')
+    plt.figtext(.65, .06, 'Figure: @run_the_sims | Data: nflfastR', fontsize=14, fontproperties=exo_regular)
 
-    plt.figtext(.65, .06, 'Figure: @run_the_sims | Data: nflfastR', fontsize=14, fontproperties=exo_regular, color='#FCC331')
-
-    plt.savefig(f'/Users/nick/sleepertoolsversion2/{metric}.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'/Users/nick/sleepertoolsversion2/{metric}-2022.png', dpi=300, bbox_inches='tight')
 
     plt.show()
